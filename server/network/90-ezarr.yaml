@@ -1,0 +1,9 @@
+# Netplan overlay, merged with the server's own netplan files (no credentials here).
+# Marks the onboard ethernet optional, so the boot does not wait for it when no cable
+# is connected (network-online.target would time out and delay Docker). It stays
+# configured by the server's own netplan, so plugging in a cable still works.
+network:
+  version: 2
+  ethernets:
+    enp0s31f6:
+      optional: true

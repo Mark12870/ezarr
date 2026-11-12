@@ -1,0 +1,10 @@
+# Give the WiFi card a fixed name (wifi0), so it no longer depends on the PCI
+# bus number, which changes when disks/cards are added (wlp<N>s0).
+# Assumes the server has exactly one WiFi card.
+# The WiFi connection itself (SSID/password) is configured in the server's own
+# netplan file under the key "wifi0" - see server/README.md.
+[Match]
+Type=wlan
+
+[Link]
+Name=wifi0
