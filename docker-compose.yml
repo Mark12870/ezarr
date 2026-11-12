@@ -9,7 +9,6 @@ services:
     devices:
       - /dev/net/tun:/dev/net/tun
     environment:
-      - FIREWALL_VPN_INPUT_PORTS=6881
       - TZ=${TIMEZONE}
       - VPN_SERVICE_PROVIDER=custom
       - VPN_TYPE=wireguard
@@ -22,8 +21,6 @@ services:
       - DNS_ADDRESS=${DNS_ADDRESS}
     ports:
       - "8080:8080"       # qBittorrent Web UI
-      - "6881:6881"       # torrent TCP
-      - "6881:6881/udp"   # torrent UDP
     restart: unless-stopped
 
   sonarr:
