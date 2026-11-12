@@ -1,0 +1,11 @@
+[Unit]
+Description=Pull and restart updated ezarr Docker containers
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=@USER@
+WorkingDirectory=@EZARR_DIR@
+ExecStart=@EZARR_DIR@/update_containers.sh
