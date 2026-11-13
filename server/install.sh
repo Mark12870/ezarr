@@ -71,3 +71,53 @@ if [ "$NET_CHANGED" = 1 ]; then
 else
   echo "Network config up to date"
 fi
+
+# --- Storage: media disk mounted at ROOT_DIR/data/media, disk health monitoring ---
+# The media disk is an ext4 filesystem with the label "ezarr-media" (see server/README.md).
+STORDIR="$EZARR_DIR/server/storage"
+ROOT_DIR="$({ grep -E '^ROOT_DIR=' "$EZARR_DIR/.env" || true; } | tail -n1 | cut -d= -f2- | sed -E "s/^[\"'](.*)[\"']\$/\1/")"
+[ -n "$ROOT_DIR" ] || { echo "!! ROOT_DIR missing in .env"; exit 1; }
+MEDIA_DIR="$(realpath -m "$ROOT_DIR/data/media")"
+MOUNT_UNIT="$(systemd-escape -p --suffix=mount "$MEDIA_DIR")"
+STOR_CHANGED=0
+
+if ! dpkg -s smartmontools >/dev/null 2>&1; then
+  sudo apt-get install -y smartmontools
+fi
+if ! sudo cmp -s "$EZARR_DIR/server/smartd/smartd.conf" /etc/smartd.conf; then
+  sudo install -m 644 -o root -g root "$EZARR_DIR/server/smartd/smartd.conf" /etc/smartd.conf
+  sudo systemctl enable smartmontools.service
+  sudo systemctl restart smartmontools.service
+  echo "Installed /etc/smartd.conf"
+fi
+
+if sudo blkid -L ezarr-media >/dev/null 2>&1; then
+  TMPS="$(mktemp -d)"
+  sed "s|@MEDIA_DIR@|$MEDIA_DIR|g" "$STORDIR/media.mount" > "$TMPS/mount"
+  sed "s|@MEDIA_DIR@|$MEDIA_DIR|g" "$STORDIR/docker-wait-media.conf" > "$TMPS/dropin"
+  for pair in "$TMPS/mount:/etc/systemd/system/$MOUNT_UNIT" \
+              "$TMPS/dropin:/etc/systemd/system/docker.service.d/50-ezarr-media.conf"; do
+    src="${pair%%:*}"; dst="${pair#*:}"
+    if ! sudo cmp -s "$src" "$dst"; then
+      sudo install -D -m 644 -o root -g root "$src" "$dst"
+      echo "Installed $dst"
+      STOR_CHANGED=1
+    fi
+  done
+  rm -rf "$TMPS"
+  if [ "$STOR_CHANGED" = 1 ]; then sudo systemctl daemon-reload; fi
+  sudo systemctl enable "$MOUNT_UNIT" >/dev/null 2>&1
+  if ! findmnt -rn "$MEDIA_DIR" >/dev/null; then
+    # Never mount over existing files: they would be hidden (and the library would look different).
+    if [ -n "$(sudo find "$MEDIA_DIR" -mindepth 1 -maxdepth 1 2>/dev/null | head -n1)" ]; then
+      echo "!! $MEDIA_DIR is not empty - not mounting the media disk over it."
+      echo "!! Move its contents onto the disk first (see server/README.md)."
+    else
+      sudo mkdir -p "$MEDIA_DIR"
+      sudo systemctl start "$MOUNT_UNIT"
+      echo "Mounted media disk at $MEDIA_DIR"
+    fi
+  fi
+else
+  echo "No filesystem labeled 'ezarr-media' - skipping media disk mount (see server/README.md)"
+fi

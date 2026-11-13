@@ -1,0 +1,14 @@
+# Mounts the media disk (ext4, filesystem label "ezarr-media") at ${ROOT_DIR}/data/media.
+# Rendered by server/install.sh: @MEDIA_DIR@ is derived from ROOT_DIR in .env, and the
+# installed unit file name must match that path (systemd-escape -p --suffix=mount).
+[Unit]
+Description=ezarr media disk
+
+[Mount]
+What=/dev/disk/by-label/ezarr-media
+Where=@MEDIA_DIR@
+Type=ext4
+Options=noatime
+
+[Install]
+WantedBy=multi-user.target
