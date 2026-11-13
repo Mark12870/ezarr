@@ -14,6 +14,9 @@ Install everything with:
 |------|-------------|---------|
 | `systemd/ezarr-update.service` | `/etc/systemd/system/` | Runs `update_containers.sh` (pull, recreate, prune) |
 | `systemd/ezarr-update.timer` | `/etc/systemd/system/` | Triggers the update daily at ~04:00 (catches up after downtime) |
+| `systemd/ezarr-backup.service` | `/etc/systemd/system/` | Runs `backup/backup_config.sh`: app configs + `.env` into one archive (see Backup below) |
+| `systemd/ezarr-backup.timer` | `/etc/systemd/system/` | Triggers the backup daily at 03:30, before the update (catches up after downtime) |
+| `apt/20auto-upgrades` | `/etc/apt/apt.conf.d/` | Automatic daily security updates (unattended-upgrades, Ubuntu default), no automatic reboots |
 | `network/10-ezarr-wifi.link` | `/etc/systemd/network/` | Fixed WiFi interface name `wifi0` (PCI-based `wlp<N>s0` names change when hardware is added). Installed only if netplan defines `wifi0`. |
 | `network/90-ezarr.yaml` | `/etc/netplan/` (mode 600) | Overlay: onboard ethernet `optional`, so the boot doesn't wait for it when no cable is connected. Merged with the server's own netplan files. |
 | `network/wait-online-wifi.conf` | `/etc/systemd/system/systemd-networkd-wait-online.service.d/50-ezarr-wifi.conf` | Boot waits (max 60 s) for `wifi0`, so Docker starts with network. Netplan itself only waits for wired links. |
@@ -41,6 +44,31 @@ in the background later. Both matter on SMR drives, which slow down badly on sca
 
 Then move the contents of `ROOT_DIR/data/media` onto it (Docker stopped), leave the folder
 empty and run `./server/install.sh`, which mounts the disk there.
+
+### Backup
+
+Every night at 03:30 `backup/backup_config.sh` packs `ROOT_DIR/config` (all app settings and
+databases, without Jellyfin's caches) and `.env` into a single archive:
+`ROOT_DIR/data/media/.ezarr-backup/ezarr-config.tar.zst` (root-only, it contains secrets).
+Only one backup is kept: the new archive replaces the old one once it is complete, so a failed
+run leaves the previous backup in place. The running containers are stopped for the copy
+(usually under a minute) so the databases are consistent, and started again afterwards.
+
+With a separate media disk, the backup survives a system disk failure. The media library
+itself is not backed up.
+
+```bash
+sudo systemctl start ezarr-backup.service     # back up now
+journalctl -u ezarr-backup.service            # logs
+```
+
+Restore (on a fresh install, after cloning this repo and before starting the containers):
+
+```bash
+sudo tar --zstd -xpf <ROOT_DIR>/data/media/.ezarr-backup/ezarr-config.tar.zst \
+  -C <ROOT_DIR> config                                    # app configs
+sudo tar --zstd -xOf <ROOT_DIR>/data/media/.ezarr-backup/ezarr-config.tar.zst .env > .env
+```
 
 ### WiFi connection: intentionally not in this repo
 

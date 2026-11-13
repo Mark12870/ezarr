@@ -8,15 +8,23 @@ RUN_USER="${SUDO_USER:-$USER}"
 
 echo "Installing ezarr server config (dir: $EZARR_DIR, user: $RUN_USER)"
 
-# --- Automatic Docker container updates (systemd timer) ---
-for unit in ezarr-update.service ezarr-update.timer; do
+# --- Daily container updates and config backup (systemd timers) ---
+if ! dpkg -s zstd >/dev/null 2>&1; then sudo apt-get install -y zstd; fi
+for unit in ezarr-update.service ezarr-update.timer ezarr-backup.service ezarr-backup.timer; do
   sed -e "s|@EZARR_DIR@|$EZARR_DIR|g" -e "s|@USER@|$RUN_USER|g" \
     "$EZARR_DIR/server/systemd/$unit" | sudo tee "/etc/systemd/system/$unit" >/dev/null
 done
-chmod +x "$EZARR_DIR/update_containers.sh"
+chmod +x "$EZARR_DIR/update_containers.sh" "$EZARR_DIR/server/backup/backup_config.sh"
 sudo systemctl daemon-reload
-sudo systemctl enable --now ezarr-update.timer
-systemctl list-timers ezarr-update.timer --no-pager
+sudo systemctl enable --now ezarr-update.timer ezarr-backup.timer
+systemctl list-timers ezarr-update.timer ezarr-backup.timer --no-pager
+
+# --- Automatic security updates (unattended-upgrades) ---
+if ! dpkg -s unattended-upgrades >/dev/null 2>&1; then sudo apt-get install -y unattended-upgrades; fi
+if ! sudo cmp -s "$EZARR_DIR/server/apt/20auto-upgrades" /etc/apt/apt.conf.d/20auto-upgrades; then
+  sudo install -m 644 -o root -g root "$EZARR_DIR/server/apt/20auto-upgrades" /etc/apt/apt.conf.d/20auto-upgrades
+  echo "Installed /etc/apt/apt.conf.d/20auto-upgrades"
+fi
 
 # --- Network: fixed WiFi name, ethernet optional, boot waits for WiFi ---
 # No credentials here: the WiFi connection (SSID/password) stays in the server's own

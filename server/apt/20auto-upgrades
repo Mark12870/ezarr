@@ -1,0 +1,6 @@
+// Automatic security updates (Ubuntu's default, kept here so a reinstall gets it too).
+// Daily: refresh package lists and install updates from the security pocket
+// (origins in /etc/apt/apt.conf.d/50unattended-upgrades). No automatic reboots.
+// Log: /var/log/unattended-upgrades/unattended-upgrades.log
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";

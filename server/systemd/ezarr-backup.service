@@ -1,0 +1,11 @@
+[Unit]
+Description=Back up ezarr app configs (single archive, replaced each run)
+After=docker.service
+Requires=docker.service
+# Finish before a container update that is due at the same time (e.g. both caught up after downtime).
+Before=ezarr-update.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=@EZARR_DIR@
+ExecStart=@EZARR_DIR@/server/backup/backup_config.sh
